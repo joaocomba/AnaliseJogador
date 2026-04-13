@@ -155,11 +155,17 @@ def load_data():
         st.warning(f"Extrato local ({path}) não encontrado. Execute o web scraper primeiro!")
         return pd.DataFrame()
 
-df = load_data()
+# --- UI HEADER: IMAGES ---
+col_logo1, col_logo2, _ = st.columns([1, 1, 4])
+with col_logo1:
+    if os.path.exists("brasileirao_logo.png"):
+        st.image("brasileirao_logo.png", width=120)
+with col_logo2:
+    if os.path.exists("farroupilha.jpeg"):
+        # Mesma largura para tentar manter altura proporcional (ajuste se necessário)
+        st.image("farroupilha.jpeg", width=120)
 
-# Se não houver dados, para execução
-if df.empty:
-    st.stop()
+df = load_data()
 
 # --- SIDEBAR FILTROS ---
 st.sidebar.image("brasileirao_logo.png", width=150)
@@ -323,22 +329,17 @@ if aba == "📊 Visão Geral":
     for col in show_df.columns:
         if col == "Escudo":
             continue
+        # Se for market_value, garantir que é numérico antes do config
+        if col == "market_value":
+            show_df[col] = pd.to_numeric(show_df[col], errors='coerce').fillna(0)
+            continue
+            
         if show_df[col].isnull().all():
             show_df[col] = "N/D"
         elif show_df[col].dtype == 'object' or show_df[col].dtype.name == 'category':
             show_df[col] = show_df[col].fillna("N/D")
         else:
             show_df[col] = show_df[col].fillna(0)
-
-    # Formatar Valor de Mercado antes de renomear para exibição
-    if 'market_value' in show_df.columns:
-        show_df['market_value_formatted'] = show_df['market_value'].apply(format_market_value)
-        # No mapping COLUMN_LABELS, 'market_value' é renomeado para 'Valor de Mercado (€)'
-        # Vamos usar uma estratégia: manter a numérica para sorting (se possível) ou apenas trocar.
-        # Streamlit st.dataframe não permite sorting por uma coluna oculta facilmente.
-        # Vamos trocar o valor original pelo formatado para atender ao pedido visual.
-        show_df['market_value'] = show_df['market_value_formatted']
-        show_df = show_df.drop(columns=['market_value_formatted'])
 
     # Renomear colunas para PT-BR
     show_df = rename_for_display(show_df)
@@ -350,6 +351,11 @@ if aba == "📊 Visão Geral":
 
     column_config = {
         "Escudo": st.column_config.ImageColumn("Time", help="Escudo Oficial do Clube"),
+        "Valor de Mercado (€)": st.column_config.NumberColumn(
+            "Valor de Mercado (€)",
+            help="Valor estimado do jogador",
+            format="€%,d"
+        ),
         "Chances Perdidas": st.column_config.NumberColumn(
             "Chances Perdidas",
             help="⚠️ Menor é melhor"
@@ -506,7 +512,7 @@ else:  # Comparador
 
                     # Métricas chave lado a lado
                     st.markdown("#### 📊 Comparação de Métricas-Chave")
-                    key_metrics = [c for c in ['goals', 'expectedGoals', 'GxG', 'rating', 'assists_passing'] if c in df_full.columns]
+                    key_metrics = [c for c in ['market_value', 'goals', 'expectedGoals', 'GxG', 'rating', 'assists_passing'] if c in df_full.columns]
                     compare_rows = [target_row] + [top_similar.iloc[i] for i in range(min(2, len(top_similar)))]
                     compare_names = [target_player] + [top_similar.iloc[i]['player_name'] for i in range(min(2, len(top_similar)))]
 
