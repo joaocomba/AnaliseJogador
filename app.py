@@ -521,6 +521,7 @@ else:  # Comparador
                          for name, row in zip(compare_names, compare_rows)},
                         index=[COLUMN_LABELS.get(m, m) for m in key_metrics]
                     )
+                    cmp_df = cmp_df.astype(object)
 
                     # Formatar Valor de Mercado no Comparador
                     mv_label = COLUMN_LABELS.get('market_value', 'market_value')
