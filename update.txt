@@ -11,4 +11,42 @@ Para atualizar os dados do Dashboard com as estatísticas mais recentes do Brasi
 
 git add data/
 git commit -m "Atualização dos dados do Brasileirão"
+git add data/
+git commit -m "Atualização dos dados do Brasileirão"
 git push -u origin main
+
+
+===================================================
+PUBLICAR NO GITHUB (enviar arquivos de código)
+===================================================
+
+Para subir todas as alterações do código para o GitHub, rode:
+
+git add .
+git commit -m "descreva o que mudou"
+git push
+
+Na primeira vez, o terminal vai pedir:
+  Username: joaocomba
+  Password: cole seu Personal Access Token (gerado em github.com/settings/tokens)
+
+
+===================================================
+PUBLICAR O APP NA WEB (Streamlit Community Cloud)
+===================================================
+
+1. Acesse: https://share.streamlit.io
+   - Faça login com sua conta GitHub (joaocomba)
+
+2. Clique em "New app" e preencha:
+   - Repository: joaocomba/AnaliseJogador
+   - Branch: main
+   - Main file path: app.py
+
+3. Clique em "Deploy"
+   - Em ~2 minutos o app estará disponível em uma URL pública como:
+     https://joaocomba-analisejogador-app-XXXXX.streamlit.app
+
+IMPORTANTE: Para atualizar o app na web com dados novos, basta rodar
+o scraper + process_data localmente e depois fazer git push.
+O Streamlit Cloud atualizará o app automaticamente ao detectar o novo commit.
