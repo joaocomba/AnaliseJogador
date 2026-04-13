@@ -146,7 +146,7 @@ if selected_positions:
 # --- HEADER ---
 st.markdown("<div class='nexus-title'>Dashboard - Performance de Jogadores</div>", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["📊 Visão Geral", "🤝 Comparador de Jogadores"])
+tab1, tab2 = st.tabs(["📊 Visão Geral", "🤝 Comparador"])
 
 with tab1:
 
