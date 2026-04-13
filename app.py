@@ -100,10 +100,7 @@ st.markdown("""
         border-right: 1px solid rgba(0,0,0,0.1);
     }
     
-    /* Ocultar header do Streamlit */
-    header { visibility: hidden; }
-    
-    /* Estilizar os blocos (Cards) - Usando transparência/bordas para funcionar em ambos os temas */
+    /* Blocos/Cards */
     div.css-1r6slb0, div.css-12oz5g7 {
         border-radius: 12px;
         padding: 20px;
