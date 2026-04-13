@@ -1,0 +1,457 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import os
+import base64
+import numpy as np
+
+# --- HELPER ESCUDOS ---
+TEAM_SHIELDS = {
+    'Athletico': 'Athletico.png',
+    'Atlético Mineiro': 'AtleticoMineiro.png',
+    'Bahia': 'Bahia.png',
+    'Botafogo': 'Botafogo.png',
+    'Chapecoense': 'Chapecoense.png',
+    'Corinthians': 'Corinthians.webp',
+    'Coritiba': 'Coritiba.png',
+    'Cruzeiro': 'Cruzeiro.png',
+    'Flamengo': 'Flamengo.png',
+    'Fluminense': 'Fluminense.webp',
+    'Grêmio': 'Gremio.png',
+    'Internacional': 'Internacional.webp',
+    'Mirassol': 'Mirassol.png',
+    'Palmeiras': 'Palmeiras.webp',
+    'Red Bull Bragantino': 'Bragantino.png',
+    'Remo': 'Remo.webp',
+    'Santos': 'Santos.webp',
+    'São Paulo': 'SaoPaulo.png',
+    'Vasco da Gama': 'Vasco.webp',
+    'Vitória': 'Vitoria.png'
+}
+
+@st.cache_data
+def get_shield_b64(team_name):
+    if not isinstance(team_name, str):
+        return None
+    # Removendo acentos e espaços não é necessário pois criamos o MAPPING exato
+    filename = TEAM_SHIELDS.get(team_name)
+    if not filename:
+        return None
+    path = os.path.join("escudos", filename)
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode()
+            ext = path.split('.')[-1]
+            return f"data:image/{ext};base64,{encoded}"
+    return None
+
+# Configuração de Página
+st.set_page_config(page_title="Brasileirão Analytics", layout="wide", initial_sidebar_state="expanded")
+
+# --- CUSTOM CSS (NEXUS STYLE) ---
+st.markdown("""
+<style>
+    /* Background e Fontes */
+    .stApp {
+        background-color: #f4f7f6;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e0e6ed;
+    }
+    
+    /* Ocultar header do Streamlit */
+    header { visibility: hidden; }
+    
+    /* Estilizar os blocos (Cards) */
+    div.css-1r6slb0, div.css-12oz5g7 {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e5e9f0;
+        margin-bottom: 20px;
+    }
+
+    /* Metric Cards */
+    [data-testid="stMetricValue"] {
+        color: #2b3648;
+        font-weight: 700;
+        font-size: 28px;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #7a869a;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    /* Titles */
+    h1, h2, h3 {
+        color: #1a202c;
+    }
+    
+    .nexus-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #2b3648;
+        margin-bottom: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --- LOAD DATA ---
+@st.cache_data(ttl=3600)
+def load_data():
+    path = "data/dataset_brasileirao_2026.parquet"
+    if os.path.exists(path):
+        df = pd.read_parquet(path)
+        return df
+    else:
+        st.warning(f"Extrato local ({path}) não encontrado. Execute o web scraper primeiro!")
+        return pd.DataFrame()
+
+df = load_data()
+
+# Se não houver dados, para execução
+if df.empty:
+    st.stop()
+
+# --- SIDEBAR FILTROS ---
+st.sidebar.image("brasileirao_logo.png", width=150)
+st.sidebar.markdown("## Filtros")
+
+teams = sorted(df['team_name'].dropna().unique())
+selected_teams = st.sidebar.multiselect("Time", teams, default=[])
+
+positions = sorted(df['position'].dropna().unique())
+default_positions = [p for p in ["F", "M"] if p in positions]
+selected_positions = st.sidebar.multiselect("Posição", positions, default=default_positions)
+
+st.sidebar.markdown("### Métricas (Mínimos)")
+min_matches = st.sidebar.slider("Mínimo Partidas Jogadas", 0, 38, 5)
+
+if 'appearances' in df.columns:
+    df = df[df['appearances'] >= min_matches]
+
+if selected_teams:
+    df = df[df['team_name'].isin(selected_teams)]
+if selected_positions:
+    df = df[df['position'].isin(selected_positions)]
+
+# --- HEADER ---
+st.markdown("<div class='nexus-title'>Dashboard - Performance de Jogadores</div>", unsafe_allow_html=True)
+
+tab1, tab2 = st.tabs(["📊 Visão Geral", "🤝 Comparador"])
+
+with tab1:
+
+    # --- KPIs ROW ---
+    col1, col2, col3, col4 = st.columns(4)
+
+    top_scorer = df.loc[df['goals'].idxmax()] if not df.empty and 'goals' in df.columns else None
+    top_gxg = df.loc[df['GxG'].idxmax()] if not df.empty and 'GxG' in df.columns else None
+    total_goals = df['goals'].sum() if 'goals' in df.columns else 0
+    total_xg = df['expectedGoals'].sum() if 'expectedGoals' in df.columns else 0
+
+    with col1:
+        st.metric("Total Goals (Filtered)", f"{total_goals:,.0f}")
+    with col2:
+        st.metric("Total xG (Filtered)", f"{total_xg:,.2f}")
+    with col3:
+        if top_scorer is not None:
+            st.metric("Top Scorer", f"{top_scorer['player_name']} ({int(top_scorer['goals'])})")
+        else:
+            st.metric("Top Scorer", "-")
+    with col4:
+        if top_gxg is not None:
+            st.metric("Maior Overperformer (GxG)", f"{top_gxg['player_name']} (+{top_gxg['GxG']:.2f})")
+        else:
+            st.metric("Maior Overperformer", "-")
+
+    st.markdown("---")
+
+    # --- CHARTS ROW ---
+    col_chart1, col_chart2 = st.columns([2, 1])
+
+    with col_chart1:
+        st.markdown("### xG vs Goals (GxG em Destaque)")
+        if 'goals' in df.columns and 'expectedGoals' in df.columns:
+            # Preparando df para plot, removendo nulos de xG e Goals e os que não jogaram nada no ataque
+            plot_df = df.dropna(subset=['goals', 'expectedGoals', 'GxG']).copy()
+            plot_df = plot_df[(plot_df['goals'] > 0) | (plot_df['expectedGoals'] > 0)]
+
+            # Cor Azul para positivo (G > xG) e vermelho para negativo (G < xG) conforme pedido do usuário
+            plot_df['Performance'] = ['Positiva (>0)' if x > 0 else 'Negativa (<0)' for x in plot_df['GxG']]
+            color_map = {'Positiva (>0)': '#3b82f6', 'Negativa (<0)': '#ef4444'} # Blue & Red
+
+            fig_scatter = px.scatter(
+                plot_df, x='expectedGoals', y='goals', color='Performance',
+                color_discrete_map=color_map,
+                hover_name='player_name', hover_data=['team_name', 'GxG'],
+                size='goals', size_max=15, opacity=0.8,
+                title=""
+            )
+            # Adicionar linha diagonal de 1:1
+            max_val = max(plot_df['expectedGoals'].max(), plot_df['goals'].max()) * 1.1
+            fig_scatter.add_shape(type="line", x0=0, y0=0, x1=max_val, y1=max_val, 
+                                  line=dict(color="Gray", dash="dash"))
+
+            fig_scatter.update_layout(
+                plot_bgcolor='white', margin=dict(t=10, l=10, r=10, b=10),
+                xaxis_title="Expected Goals (xG)", yaxis_title="Goals Scored",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
+
+    with col_chart2:
+        st.markdown("### GxG Distribution")
+        if 'GxG' in df.columns:
+            fig_hist = px.histogram(df, x='GxG', nbins=30, opacity=0.8,
+                                    color_discrete_sequence=['#8b5cf6']) # Purple accent
+            fig_hist.update_layout(
+                plot_bgcolor='white', margin=dict(t=10, l=10, r=10, b=10),
+                xaxis_title="GxG", yaxis_title="Frequency", showlegend=False
+            )
+            fig_hist.add_vline(x=0, line_dash="dash", line_color="black")
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+    # --- EXPLORADOR CUSTOMIZADO ---
+    st.markdown("### Explorador de Variáveis Interativo")
+    col_eixo_x, col_eixo_y = st.columns(2)
+
+    # Filtrar apenas colunas numéricas para o scatterplot
+    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+
+    with col_eixo_x:
+        default_x = numeric_cols.index('expectedGoals') if 'expectedGoals' in numeric_cols else 0
+        eixo_x = st.selectbox("Variável do Eixo X", numeric_cols, index=default_x)
+
+    with col_eixo_y:
+        default_y = numeric_cols.index('goals') if 'goals' in numeric_cols else (1 if len(numeric_cols) > 1 else 0)
+        eixo_y = st.selectbox("Variável do Eixo Y", numeric_cols, index=default_y)
+
+    if eixo_x and eixo_y:
+        fig_explorer = px.scatter(
+            df, x=eixo_x, y=eixo_y, 
+            color='team_name' if 'team_name' in df.columns else None,
+            hover_name='player_name' if 'player_name' in df.columns else None, 
+            hover_data=['team_name'] if 'team_name' in df.columns else [],
+            title=f"{eixo_y} vs {eixo_x}",
+            opacity=0.8,
+            size_max=12
+        )
+        # Formatação mais suave e clean
+        fig_explorer.update_layout(
+            plot_bgcolor='white', margin=dict(t=30, l=10, r=10, b=10),
+            xaxis_gridcolor="#e5e9f0", yaxis_gridcolor="#e5e9f0"
+        )
+        st.plotly_chart(fig_explorer, use_container_width=True)
+
+
+    # --- TABELA COMPLETA NATIVA ---
+    st.markdown("### Detalhamento Interativo de Jogadores")
+
+    # Pegar *todas* as colunas do dataset ao invés de apenas uma seleção com cols_to_show
+    show_df = df.copy()
+
+    # Mapeando a coluna de Escudos usando o Team Name
+    if 'team_name' in show_df.columns:
+        show_df.insert(0, "Escudo", show_df["team_name"].apply(get_shield_b64))
+
+    # Tratar os dados faltantes nas colunas e aplicar formatações essenciais
+    for col in show_df.columns:
+        if col == "Escudo":
+            continue
+        if show_df[col].isnull().all():
+            show_df[col] = "N/D"
+        elif show_df[col].dtype == 'object' or show_df[col].dtype.name == 'category':
+            show_df[col] = show_df[col].fillna("N/D")
+        else:
+            show_df[col] = show_df[col].fillna(0)
+
+    if 'GxG' in show_df.columns:
+        show_df['GxG'] = show_df['GxG'].round(2)
+    if 'expectedGoals' in show_df.columns:
+        show_df['expectedGoals'] = show_df['expectedGoals'].round(2)
+
+    # Criando configuração gráfica das colunas na nova Tabela Nativa do Streamlit
+    column_config = {
+        "Escudo": st.column_config.ImageColumn(
+            "Time", help="Escudo Oficial do Clube"
+        )
+    }
+
+    st.dataframe(
+        show_df,
+        use_container_width=True,
+        height=500,
+        hide_index=True,
+        column_config=column_config,
+        column_order=["Escudo", "player_name", "team_name"] + [c for c in show_df.columns if c not in ["Escudo", "player_name", "team_name"]]
+    )
+
+
+
+with tab2:
+    st.markdown("### Motor de Similaridade & Radar Estatístico")
+    st.markdown("Selecione o time e depois o jogador. O algoritmo encontrará os **Gêmeos Estatísticos** desse atleta na liga, usando Distância Euclidiana nos percentis de todas as métricas.")
+
+    # --- Usamos df_full (sem filtros de sidebar) para o comparador ---
+    df_full = load_data()
+
+    col_team_sel, col_player_sel = st.columns(2)
+
+    with col_team_sel:
+        teams_sorted = sorted(df_full['team_name'].dropna().unique())
+        target_team = st.selectbox("1️⃣  Selecione o Time:", teams_sorted, key="comp_team")
+
+    with col_player_sel:
+        players_in_team = sorted(
+            df_full[df_full['team_name'] == target_team]['player_name'].dropna().unique()
+        )
+        target_player = st.selectbox("2️⃣  Selecione o Jogador:", players_in_team, key="comp_player")
+
+    if target_player:
+        target_rows = df_full[df_full['player_name'] == target_player]
+
+        if len(target_rows) > 0:
+            target_row = target_rows.iloc[0]
+            pos_target = target_row['position']
+
+            # -- Agrupamento: mesma posição, ou todos se posição for nula --
+            if pd.notna(pos_target) and pos_target != "N/D":
+                df_pos = df_full[df_full['position'] == pos_target].copy()
+                group_label = f"(posição: {pos_target})"
+            else:
+                df_pos = df_full.copy()
+                group_label = "(toda a liga)"
+
+            # Colunas numéricas relevantes para o cálculo
+            numeric_cols = df_pos.select_dtypes(include=['number']).columns.tolist()
+            numeric_cols = [c for c in numeric_cols if c not in ['player_id']]
+
+            # Garante que o jogador alvo está no grupo
+            if target_player not in df_pos['player_name'].values:
+                df_pos = df_full.copy()
+                group_label = "(toda a liga)"
+
+            # Remove linhas onde TODOS os numéricos são NaN
+            df_pos = df_pos.dropna(subset=numeric_cols, how='all').reset_index(drop=True)
+
+            if len(df_pos) > 1 and len(numeric_cols) > 0:
+                # Percentil ranking (0–1)
+                pct_df = df_pos[numeric_cols].rank(pct=True).fillna(0)
+
+                target_mask = df_pos['player_name'] == target_player
+                if target_mask.sum() == 0:
+                    st.warning("Jogador não encontrado no grupo. Tente outro.")
+                    st.stop()
+
+                target_idx = df_pos[target_mask].index[0]
+                target_vector = pct_df.loc[target_idx]
+
+                # Distância Euclidiana
+                distances = ((pct_df - target_vector) ** 2).sum(axis=1) ** 0.5
+                df_pos = df_pos.copy()
+                df_pos['_distance'] = distances.values
+
+                top_similar = (
+                    df_pos[df_pos['player_name'] != target_player]
+                    .sort_values('_distance')
+                    .head(3)
+                )
+
+                st.markdown(f"---\n**Comparando {target_player}** com jogadores {group_label}\n")
+
+                if len(top_similar) == 0:
+                    st.info("Não foram encontrados jogadores similares suficientes.")
+                else:
+                    sim_1 = top_similar.iloc[0]
+                    sim_1_idx = top_similar.index[0]
+
+                    rad_col, res_col = st.columns([1, 1.2])
+
+                    with rad_col:
+                        focal_categories = [
+                            'goals', 'expectedGoals', 'GxG', 'rating',
+                            'totalShots', 'successfulDribbles',
+                            'assists_passing', 'keyPasses_passing'
+                        ]
+                        focal_categories = [c for c in focal_categories if c in numeric_cols]
+                        if len(focal_categories) < 3:
+                            focal_categories = numeric_cols[:6]
+
+                        fig_rad = go.Figure()
+
+                        colors = ['#2b3648', '#3b82f6', '#10b981']
+                        for i, (_, row) in enumerate([(-1, target_row)] + list(top_similar.iterrows())[:2]):
+                            if i == 0:
+                                # Jogador alvo
+                                r_vals = pct_df.loc[target_idx, focal_categories].values.tolist()
+                                label = f"{target_player} ({target_row['team_name']})"
+                            else:
+                                row = top_similar.iloc[i - 1]
+                                r_vals = pct_df.loc[top_similar.index[i - 1], focal_categories].values.tolist()
+                                label = f"{row['player_name']} ({row['team_name']})"
+
+                            fig_rad.add_trace(go.Scatterpolar(
+                                r=r_vals,
+                                theta=focal_categories,
+                                fill='toself',
+                                name=label,
+                                line_color=colors[i],
+                                opacity=0.75
+                            ))
+
+                        fig_rad.update_layout(
+                            polar=dict(radialaxis=dict(visible=False, range=[0, 1])),
+                            showlegend=True,
+                            title="Radar Percentil na Liga",
+                            margin=dict(t=60, l=20, r=20, b=20),
+                            legend=dict(orientation="v", x=1.05)
+                        )
+                        st.plotly_chart(fig_rad, use_container_width=True)
+
+                    with res_col:
+                        st.markdown("#### 🏆 Top 3 Jogadores Mais Similares")
+                        for rank, (_, row) in enumerate(top_similar.iterrows(), start=1):
+                            dist = row['_distance']
+                            # Normaliza a distância para 0-100% de forma mais realista
+                            max_possible_dist = (len(numeric_cols)) ** 0.5
+                            similarity_pct = max(0.0, (1 - dist / max_possible_dist) * 100)
+                            shield_b64 = get_shield_b64(row['team_name'])
+                            medal = ["🥇", "🥈", "🥉"][rank - 1]
+
+                            with st.container():
+                                c1, c2 = st.columns([1, 5])
+                                with c1:
+                                    if shield_b64:
+                                        st.image(shield_b64, width=48)
+                                with c2:
+                                    st.markdown(
+                                        f"{medal} **{row['player_name']}**  \n"
+                                        f"*{row['team_name']}*  \n"
+                                        f"Similaridade: **{similarity_pct:.1f}%**"
+                                    )
+                                st.markdown("---")
+
+                        # Métricas chave lado a lado
+                        st.markdown("#### 📊 Comparação de Métricas-Chave")
+                        key_metrics = [c for c in ['goals', 'expectedGoals', 'GxG', 'rating', 'assists_passing'] if c in df_full.columns]
+                        compare_rows = [target_row] + [top_similar.iloc[i] for i in range(min(2, len(top_similar)))]
+                        compare_names = [target_player] + [top_similar.iloc[i]['player_name'] for i in range(min(2, len(top_similar)))]
+
+                        cmp_df = pd.DataFrame(
+                            {name: [row[m] if m in row.index else None for m in key_metrics]
+                             for name, row in zip(compare_names, compare_rows)},
+                            index=key_metrics
+                        )
+                        st.dataframe(cmp_df.round(2), use_container_width=True)
+
+            else:
+                st.warning("Não há jogadores suficientes no grupo para calcular similaridade.")
