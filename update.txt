@@ -1,0 +1,14 @@
+Para atualizar os dados do Dashboard com as estatísticas mais recentes do Brasileirão, você sempre deve rodar os seguintes comandos através do seu terminal (certifique-se de estar na pasta do projeto):
+
+1. Rodar o Web Scraper para baixar os dados atualizados das APIs:
+   .venv/bin/python scraper.py
+
+2. Rodar o Processador de Dados para limpar, combinar tudo e recalcular a métrica do GxG:
+   .venv/bin/python process_data.py
+
+---
+(Opcional) Se você quiser também enviar essa base de dados mais nova lá para o seu Github, após terminar o Passo 1 e o Passo 2 com sucesso, basta rodar:
+
+git add data/
+git commit -m "Atualização dos dados do Brasileirão"
+git push -u origin main
