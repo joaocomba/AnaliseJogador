@@ -5,16 +5,17 @@ import os
 import urllib.parse
 from playwright.async_api import async_playwright
 
-CATEGORIES = ['attack', 'defense', 'passing', 'goalkeeping']
+CATEGORIES = ['attack', 'defence', 'passing', 'goalkeeping', 'detailed']
 LIMIT = 20
-TOTAL_PAGES = 30  # 20 teams * ~25 players = 500 / 20 = 25 pages
+TOTAL_PAGES = 32  # 20 teams * ~30 players = 600 / 20 = 30 pages.
 
-# Parâmetro de ordenação por categoria (order= deve corresponder a um campo retornado)
+# Parâmetro de ordenação por categoria
 CATEGORY_ORDER = {
     'attack':      '-goals',
-    'defense':     '-tackles',
+    'defence':     '-interceptions',
     'passing':     '-accuratePasses',
     'goalkeeping': '-saves',
+    'detailed':    '-rating',
 }
 
 async def fetch_category_data(page, base_url, category):
@@ -50,7 +51,7 @@ async def fetch_category_data(page, base_url, category):
         data = await page.evaluate(js_code)
         if data and 'results' in data and len(data['results']) > 0:
             all_results.extend(data['results'])
-            await asyncio.sleep(0.5) # rate limit
+            await asyncio.sleep(0.4) # rate limit
         else:
             break # No more results or blocked
     
@@ -77,22 +78,7 @@ async def main():
         
         print("Navigating to Brasileirão page...")
         await page.goto("https://www.sofascore.com/tournament/football/brazil/brasileirao-serie-a/325", wait_until="domcontentloaded")
-        
-        print("Waiting for page interaction...")
-        await asyncio.sleep(3)
-        
-        # Tentativa de clicar na aba Player Statistics
-        try:
-            print("Clicking on Player Statistics tab...")
-            await page.get_by_text("Player statistics", exact=True).click(timeout=5000)
-            await asyncio.sleep(2)
-        except Exception as e:
-            try:
-                # Se falhar tenta uppercase ou outro seletor
-                await page.get_by_text("PLAYER STATISTICS").click(timeout=5000)
-                await asyncio.sleep(2)
-            except Exception as e2:
-                print("Could not click Player Statistics automatically.")
+        await asyncio.sleep(4)
         
         # Se não pegou a API, como fallback da temporada 2026:
         if not api_url:
@@ -101,49 +87,58 @@ async def main():
             
         print(f"Base API URL detected: {api_url}")
         
-        # Agora vamos iterar por Attack, Defense, Passing, GK
-        all_data = {}
+        # Iterar pelas categorias
+        all_players_meta = {}
         for cat in CATEGORIES:
             res = await fetch_category_data(page, api_url, cat)
             print(f"Total players collected for {cat}: {len(res)}")
-            all_data[cat] = res
-
-            # Save raw json for each category
+            
+            # Save raw json
             with open(f"data/raw_{cat}.json", "w") as f:
                 json.dump(res, f)
-
-        # --- Buscar posição de cada jogador via API individual do Sofascore ---
-        print("Fetching player positions...")
-        player_ids = set()
-        for cat_data in all_data.values():
-            for row in cat_data:
+            
+            for row in res:
                 pid = row.get('player', {}).get('id')
                 if pid:
-                    player_ids.add(pid)
+                    all_players_meta[pid] = row.get('player', {}).get('name')
 
-        positions = {}
-        for pid in list(player_ids)[:200]:  # Limitar a 200 p/ não sobrecarregar a API
+        # Buscar detalhes (Posição e Valor de Mercado) de TODOS os jogadores
+        print(f"Fetching details (positions & market value) for {len(all_players_meta)} unique players...")
+        player_details = {}
+        
+        # Batching processing to show progress
+        pids = list(all_players_meta.keys())
+        for i, pid in enumerate(pids):
+            if i % 50 == 0:
+                print(f"Progress: {i}/{len(pids)} players fetched...")
+                
             url = f"https://api.sofascore.com/api/v1/player/{pid}"
             try:
                 js = f"""
                 async () => {{
-                    const r = await fetch('{url}');
-                    if (r.status !== 200) return null;
-                    return await r.json();
+                    try {{
+                        const r = await fetch('{url}');
+                        if (r.status !== 200) return null;
+                        return await r.json();
+                    }} catch(e) {{ return null; }}
                 }}
                 """
                 data = await page.evaluate(js)
                 if data and 'player' in data:
-                    pos = data['player'].get('position')
-                    positions[pid] = pos
-                await asyncio.sleep(0.15)
+                    p = data['player']
+                    player_details[pid] = {
+                        'position': p.get('position'),
+                        'positionsDetailed': p.get('positionsDetailed', []),
+                        'marketValue': p.get('proposedMarketValue')
+                    }
+                await asyncio.sleep(0.12) # Gentle rate limit
             except Exception:
                 pass
 
-        with open('data/player_positions.json', 'w') as f:
-            json.dump(positions, f)
-        print(f"Positions fetched for {len(positions)} players.")
-
+        with open('data/player_details.json', 'w') as f:
+            json.dump(player_details, f)
+            
+        print(f"Details fetched for {len(player_details)} players.")
         await browser.close()
         print("Data collection finished!")
 

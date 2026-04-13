@@ -4,6 +4,42 @@ import os
 
 print("Iniciando ETL: Processamento de Dados do Sofascore...")
 
+POSITION_MAP = {
+    'GK': 'GL',
+    'ST': 'ATA',
+    'CF': 'ATA',
+    'LW': 'PE',
+    'RW': 'PD',
+    'AM': 'MEI',
+    'CM': 'MC',
+    'DM': 'VOL',
+    'LB': 'LE',
+    'LWB': 'LE',
+    'RB': 'LD',
+    'RWB': 'LD',
+    'CB': 'ZAG'
+}
+
+def map_position(row_details):
+    if not row_details:
+        return "N/D"
+    
+    detailed = row_details.get('positionsDetailed', [])
+    if detailed:
+        # Pega a primeira posição detalhada que conseguirmos mapear
+        for pos in detailed:
+            if pos in POSITION_MAP:
+                return POSITION_MAP[pos]
+    
+    # Fallback para o geral
+    general = row_details.get('position')
+    if general == 'G': return 'GL'
+    if general == 'D': return 'ZAG' # Fallback seguro
+    if general == 'M': return 'MC'
+    if general == 'F': return 'ATA'
+    
+    return "N/D"
+
 def load_category(category):
     file_path = f"data/raw_{category}.json"
     if not os.path.exists(file_path):
@@ -37,7 +73,7 @@ def load_category(category):
     df = pd.DataFrame(records)
     df = df.drop_duplicates(subset=['player_id'])
 
-    # Adicionar sufixo de categoria (exceto attack e colunas base)
+    # Adicionar sufixo de categoria (exceto colunas base)
     if category != 'attack':
         base_cols = ['player_id', 'player_name', 'team_name']
         rename_dict = {col: f"{col}_{category}" for col in df.columns if col not in base_cols}
@@ -45,7 +81,7 @@ def load_category(category):
 
     return df
 
-categories = ['attack', 'defense', 'passing', 'goalkeeping']
+categories = ['attack', 'defence', 'passing', 'goalkeeping', 'detailed']
 base_df = load_category('attack')
 
 if base_df.empty:
@@ -56,35 +92,36 @@ else:
         if not df_cat.empty:
             base_df = base_df.merge(df_cat, on=['player_id', 'player_name', 'team_name'], how='outer')
 
-    # --- Resolver posições via arquivo gerado pelo scraper ---
-    positions_path = 'data/player_positions.json'
-    if os.path.exists(positions_path):
-        with open(positions_path) as f:
-            positions_map = json.load(f)
-        # O JSON usa string keys
+    # --- Resolver detalhes (Posição e Valor de Mercado) ---
+    details_path = 'data/player_details.json'
+    if os.path.exists(details_path):
+        with open(details_path) as f:
+            details_map = json.load(f)
+        
+        # Mapear Posição Detalhada
         base_df['position'] = base_df['player_id'].map(
-            lambda pid: positions_map.get(str(pid)) or positions_map.get(pid)
+            lambda pid: map_position(details_map.get(str(pid)) or details_map.get(pid))
         )
-        total_with_pos = base_df['position'].notna().sum()
-        print(f"Posição resolvida para {total_with_pos}/{len(base_df)} jogadores.")
+        
+        # Inserir Valor de Mercado
+        base_df['market_value'] = base_df['player_id'].map(
+            lambda pid: (details_map.get(str(pid)) or details_map.get(pid, {})).get('marketValue')
+        )
+        
+        print(f"Detalhes de posição e valor integrados para {len(base_df)} jogadores.")
     else:
-        base_df['position'] = None
-        print("Aviso: player_positions.json não encontrado. Execute o scraper para popular posições.")
-
-    print(f"Colunas disponíveis: {list(base_df.columns)}")
+        base_df['position'] = "N/D"
+        base_df['market_value'] = 0
+        print("Aviso: player_details.json não encontrado.")
 
     # Cálculo do GxG
     if 'goals' in base_df.columns and 'expectedGoals' in base_df.columns:
         base_df['goals'] = base_df['goals'].fillna(0)
         base_df['expectedGoals'] = base_df['expectedGoals'].fillna(0)
         base_df['GxG'] = base_df['goals'] - base_df['expectedGoals']
-        print("Nova métrica 'GxG' criada com sucesso.")
-    else:
-        print("Aviso: 'goals' ou 'expectedGoals' não encontrados.")
-
-    # Remover colunas desnecessárias
-    cols_to_drop = ['rating_passing']
-    base_df = base_df.drop(columns=[c for c in cols_to_drop if c in base_df.columns])
+    
+    # Renomear algumas colunas de 'detailed' para nomes mais amigáveis antes do processamento final se necessário
+    # mas o app.py cuida disso via COLUMN_LABELS.
 
     # Salvar
     output_path = "data/dataset_brasileirao_2026.parquet"
