@@ -11,8 +11,6 @@ Para atualizar os dados do Dashboard com as estatísticas mais recentes do Brasi
 
 git add data/
 git commit -m "Atualização dos dados do Brasileirão"
-git add data/
-git commit -m "Atualização dos dados do Brasileirão"
 git push -u origin main
 
 
