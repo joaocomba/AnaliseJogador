@@ -6,6 +6,35 @@ import os
 import base64
 import numpy as np
 
+# --- MAPEAMENTO DE NOMES DE COLUNAS (PT-BR) ---
+COLUMN_LABELS = {
+    'player_id':                       'ID',
+    'player_name':                     'Jogador',
+    'team_name':                       'Time',
+    'position':                        'Posição',
+    'goals':                           'Gols',
+    'expectedGoals':                   'xG',
+    'GxG':                             'GxG',
+    'bigChancesMissed':                'Chances Perdidas',
+    'successfulDribbles':              'Dribles',
+    'totalShots':                      'Finalizações',
+    'goalConversionPercentage':        'Conversão de Finalização (%)',
+    'rating':                          'Nota Média',
+    'bigChancesCreated_passing':       'Chances Criadas',
+    'assists_passing':                 'Assistências',
+    'accuratePasses_passing':          'Passes Certos',
+    'accuratePassesPercentage_passing':'Conversão de Passes (%)',
+    'keyPasses_passing':               'Passes Chave',
+    # Colunas defensivas (após re-scrape)
+    'tackles_defense':                 'Desarmes',
+    'interceptions_defense':           'Interceptações',
+    'clearances_defense':              'Cortes',
+    'blockedShots_defense':            'Chutes Bloqueados',
+    'dribbledPast_defense':            'Driblado',
+    'errorLeadToGoal_defense':         'Erros que Geraram Gol',
+    'rating_defense':                  'Nota Média (Def)',
+}
+
 # --- HELPER ESCUDOS ---
 TEAM_SHIELDS = {
     'Athletico': 'Athletico.png',
@@ -34,7 +63,6 @@ TEAM_SHIELDS = {
 def get_shield_b64(team_name):
     if not isinstance(team_name, str):
         return None
-    # Removendo acentos e espaços não é necessário pois criamos o MAPPING exato
     filename = TEAM_SHIELDS.get(team_name)
     if not filename:
         return None
@@ -45,6 +73,10 @@ def get_shield_b64(team_name):
             ext = path.split('.')[-1]
             return f"data:image/{ext};base64,{encoded}"
     return None
+
+def rename_for_display(df):
+    """Renomeia colunas para exibição, sem alterar o DataFrame original."""
+    return df.rename(columns={k: v for k, v in COLUMN_LABELS.items() if k in df.columns})
 
 # Configuração de Página
 st.set_page_config(page_title="Brasileirão Analytics", layout="wide", initial_sidebar_state="expanded")
@@ -146,9 +178,17 @@ if selected_positions:
 # --- HEADER ---
 st.markdown("<div class='nexus-title'>Dashboard - Performance de Jogadores</div>", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["📊 Visão Geral", "🤝 Comparador"])
+# --- NAVEGAÇÃO (radio button — compatível com mobile) ---
+aba = st.radio(
+    "",
+    ["📊 Visão Geral", "🤝 Comparador"],
+    horizontal=True,
+    label_visibility="collapsed",
+    key="nav_aba"
+)
+st.markdown("<hr style='margin:6px 0 16px 0'>", unsafe_allow_html=True)
 
-with tab1:
+if aba == "📊 Visão Geral":
 
     # --- KPIs ROW ---
     col1, col2, col3, col4 = st.columns(4)
@@ -159,19 +199,19 @@ with tab1:
     total_xg = df['expectedGoals'].sum() if 'expectedGoals' in df.columns else 0
 
     with col1:
-        st.metric("Total Goals (Filtered)", f"{total_goals:,.0f}")
+        st.metric("Total de Gols", f"{total_goals:,.0f}")
     with col2:
-        st.metric("Total xG (Filtered)", f"{total_xg:,.2f}")
+        st.metric("Total xG", f"{total_xg:,.2f}")
     with col3:
         if top_scorer is not None:
-            st.metric("Top Scorer", f"{top_scorer['player_name']} ({int(top_scorer['goals'])})")
+            st.metric("Artilheiro", f"{top_scorer['player_name']} ({int(top_scorer['goals'])})")
         else:
-            st.metric("Top Scorer", "-")
+            st.metric("Artilheiro", "-")
     with col4:
         if top_gxg is not None:
-            st.metric("Maior Overperformer (GxG)", f"{top_gxg['player_name']} (+{top_gxg['GxG']:.2f})")
+            st.metric("Maior GxG", f"{top_gxg['player_name']} (+{top_gxg['GxG']:.2f})")
         else:
-            st.metric("Maior Overperformer", "-")
+            st.metric("Maior GxG", "-")
 
     st.markdown("---")
 
@@ -224,46 +264,50 @@ with tab1:
     st.markdown("### Explorador de Variáveis Interativo")
     col_eixo_x, col_eixo_y = st.columns(2)
 
-    # Filtrar apenas colunas numéricas para o scatterplot
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+    # Usar rótulos traduzidos para os selectboxes, mapeando devolta para nome interno
+    numeric_cols_raw = df.select_dtypes(include=['number']).columns.tolist()
+    numeric_labels = {COLUMN_LABELS.get(c, c): c for c in numeric_cols_raw}
+    label_list = list(numeric_labels.keys())
 
     with col_eixo_x:
-        default_x = numeric_cols.index('expectedGoals') if 'expectedGoals' in numeric_cols else 0
-        eixo_x = st.selectbox("Variável do Eixo X", numeric_cols, index=default_x)
+        default_x_label = COLUMN_LABELS.get('expectedGoals', 'expectedGoals')
+        default_x_idx = label_list.index(default_x_label) if default_x_label in label_list else 0
+        eixo_x_label = st.selectbox("Variável do Eixo X", label_list, index=default_x_idx)
+        eixo_x = numeric_labels[eixo_x_label]
 
     with col_eixo_y:
-        default_y = numeric_cols.index('goals') if 'goals' in numeric_cols else (1 if len(numeric_cols) > 1 else 0)
-        eixo_y = st.selectbox("Variável do Eixo Y", numeric_cols, index=default_y)
+        default_y_label = COLUMN_LABELS.get('goals', 'goals')
+        default_y_idx = label_list.index(default_y_label) if default_y_label in label_list else min(1, len(label_list)-1)
+        eixo_y_label = st.selectbox("Variável do Eixo Y", label_list, index=default_y_idx)
+        eixo_y = numeric_labels[eixo_y_label]
 
     if eixo_x and eixo_y:
         fig_explorer = px.scatter(
-            df, x=eixo_x, y=eixo_y, 
+            df, x=eixo_x, y=eixo_y,
             color='team_name' if 'team_name' in df.columns else None,
-            hover_name='player_name' if 'player_name' in df.columns else None, 
+            hover_name='player_name' if 'player_name' in df.columns else None,
             hover_data=['team_name'] if 'team_name' in df.columns else [],
-            title=f"{eixo_y} vs {eixo_x}",
+            labels=COLUMN_LABELS,
+            title=f"{eixo_y_label} vs {eixo_x_label}",
             opacity=0.8,
             size_max=12
         )
-        # Formatação mais suave e clean
         fig_explorer.update_layout(
             plot_bgcolor='white', margin=dict(t=30, l=10, r=10, b=10),
             xaxis_gridcolor="#e5e9f0", yaxis_gridcolor="#e5e9f0"
         )
         st.plotly_chart(fig_explorer, use_container_width=True)
 
-
     # --- TABELA COMPLETA NATIVA ---
     st.markdown("### Detalhamento Interativo de Jogadores")
 
-    # Pegar *todas* as colunas do dataset ao invés de apenas uma seleção com cols_to_show
     show_df = df.copy()
 
-    # Mapeando a coluna de Escudos usando o Team Name
+    # Adicionar escudos
     if 'team_name' in show_df.columns:
         show_df.insert(0, "Escudo", show_df["team_name"].apply(get_shield_b64))
 
-    # Tratar os dados faltantes nas colunas e aplicar formatações essenciais
+    # Tratar dados faltantes
     for col in show_df.columns:
         if col == "Escudo":
             continue
@@ -279,11 +323,22 @@ with tab1:
     if 'expectedGoals' in show_df.columns:
         show_df['expectedGoals'] = show_df['expectedGoals'].round(2)
 
-    # Criando configuração gráfica das colunas na nova Tabela Nativa do Streamlit
+    # Remover rating_passing se ainda existir
+    show_df = show_df.drop(columns=[c for c in ['rating_passing'] if c in show_df.columns])
+
+    # Renomear colunas para PT-BR
+    show_df = rename_for_display(show_df)
+
+    # Escudo sempre primeiro, depois Jogador e Time
+    ordered_cols = ["Escudo"] + [c for c in ["Jogador", "Time", "Posição", "Gols", "xG", "GxG"] if c in show_df.columns] \
+                   + [c for c in show_df.columns if c not in ["Escudo", "Jogador", "Time", "Posição", "Gols", "xG", "GxG"]]
+
     column_config = {
-        "Escudo": st.column_config.ImageColumn(
-            "Time", help="Escudo Oficial do Clube"
-        )
+        "Escudo": st.column_config.ImageColumn("Time", help="Escudo Oficial do Clube"),
+        "Chances Perdidas": st.column_config.NumberColumn(
+            "Chances Perdidas",
+            help="⚠️ Menor é melhor"
+        ),
     }
 
     st.dataframe(
@@ -292,12 +347,11 @@ with tab1:
         height=500,
         hide_index=True,
         column_config=column_config,
-        column_order=["Escudo", "player_name", "team_name"] + [c for c in show_df.columns if c not in ["Escudo", "player_name", "team_name"]]
+        column_order=[c for c in ordered_cols if c in show_df.columns]
     )
 
 
-
-with tab2:
+else:  # Comparador
     st.markdown("### Motor de Similaridade & Radar Estatístico")
     st.markdown("Selecione o time e depois o jogador. O algoritmo encontrará os **Gêmeos Estatísticos** desse atleta na liga, usando Distância Euclidiana nos percentis de todas as métricas.")
 

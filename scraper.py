@@ -7,7 +7,15 @@ from playwright.async_api import async_playwright
 
 CATEGORIES = ['attack', 'defense', 'passing', 'goalkeeping']
 LIMIT = 20
-TOTAL_PAGES = 30 # A safe upper bound for 20 teams * ~25 players = 500 / 20 = 25 pages.
+TOTAL_PAGES = 30  # 20 teams * ~25 players = 500 / 20 = 25 pages
+
+# Parâmetro de ordenação por categoria (order= deve corresponder a um campo retornado)
+CATEGORY_ORDER = {
+    'attack':      '-goals',
+    'defense':     '-tackles',
+    'passing':     '-accuratePasses',
+    'goalkeeping': '-saves',
+}
 
 async def fetch_category_data(page, base_url, category):
     all_results = []
@@ -21,7 +29,9 @@ async def fetch_category_data(page, base_url, category):
         q['offset'] = [str(offset)]
         q['limit'] = [str(LIMIT)]
         q['group'] = [category]
-        
+        q['order'] = [CATEGORY_ORDER.get(category, '-rating')]
+        q['accumulation'] = ['total']
+
         new_query = urllib.parse.urlencode(q, doseq=True)
         new_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, new_query, parsed.fragment))
         
@@ -97,10 +107,42 @@ async def main():
             res = await fetch_category_data(page, api_url, cat)
             print(f"Total players collected for {cat}: {len(res)}")
             all_data[cat] = res
-            
+
             # Save raw json for each category
             with open(f"data/raw_{cat}.json", "w") as f:
                 json.dump(res, f)
+
+        # --- Buscar posição de cada jogador via API individual do Sofascore ---
+        print("Fetching player positions...")
+        player_ids = set()
+        for cat_data in all_data.values():
+            for row in cat_data:
+                pid = row.get('player', {}).get('id')
+                if pid:
+                    player_ids.add(pid)
+
+        positions = {}
+        for pid in list(player_ids)[:200]:  # Limitar a 200 p/ não sobrecarregar a API
+            url = f"https://api.sofascore.com/api/v1/player/{pid}"
+            try:
+                js = f"""
+                async () => {{
+                    const r = await fetch('{url}');
+                    if (r.status !== 200) return null;
+                    return await r.json();
+                }}
+                """
+                data = await page.evaluate(js)
+                if data and 'player' in data:
+                    pos = data['player'].get('position')
+                    positions[pid] = pos
+                await asyncio.sleep(0.15)
+            except Exception:
+                pass
+
+        with open('data/player_positions.json', 'w') as f:
+            json.dump(positions, f)
+        print(f"Positions fetched for {len(positions)} players.")
 
         await browser.close()
         print("Data collection finished!")
