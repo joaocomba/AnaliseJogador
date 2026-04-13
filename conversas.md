@@ -28,7 +28,8 @@ Este arquivo registra o desenvolvimento do projeto através das solicitações d
 - [x] **Acesso Mobile**: Restaurar visibilidade do botão de menu lateral (hambúrguer) no celular.
 - [x] **Ordenação de Valores**: Corrigir a ordenação da coluna de mercado para ser numérica (removendo a formatação de string que quebrava o sort).
 - [x] **Identidade Visual**: Adicionar a imagem `farroupilha.jpeg` ao lado do logo do Brasileirão no topo.
-- [x] **Comparador**: Incluir a métrica de Valor de Mercado na tabela de comparação de métricas-chave.
+- [x] **Comparador**: Incluir a métrica de Valor de Mercado na tabela de comparação de métricas-chave e formatar com o padrão (€M/k).
+- [x] **Sidebar**: Remover logo redundante e definir todas as posições como selecionadas por default.
 - [x] **Registro**: Atualizar o arquivo `conversas.md` para documentar o progresso.
 
 ---

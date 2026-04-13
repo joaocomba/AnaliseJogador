@@ -168,14 +168,13 @@ with col_logo2:
 df = load_data()
 
 # --- SIDEBAR FILTROS ---
-st.sidebar.image("brasileirao_logo.png", width=150)
 st.sidebar.markdown("## Filtros")
 
 teams = sorted(df['team_name'].dropna().unique())
 selected_teams = st.sidebar.multiselect("Time", teams, default=[])
 
 positions = sorted(df['position'].dropna().unique())
-default_positions = [p for p in ["ATA", "PE", "PD", "MEI"] if p in positions]
+default_positions = positions
 selected_positions = st.sidebar.multiselect("Posição", positions, default=default_positions)
 
 st.sidebar.markdown("### Métricas (Mínimos)")
@@ -522,7 +521,13 @@ else:  # Comparador
                          for name, row in zip(compare_names, compare_rows)},
                         index=[COLUMN_LABELS.get(m, m) for m in key_metrics]
                     )
-                    st.dataframe(cmp_df.round(2), use_container_width=True)
+
+                    # Formatar Valor de Mercado no Comparador
+                    mv_label = COLUMN_LABELS.get('market_value', 'market_value')
+                    if mv_label in cmp_df.index:
+                        cmp_df.loc[mv_label] = cmp_df.loc[mv_label].apply(format_market_value)
+
+                    st.dataframe(cmp_df, use_container_width=True)
 
         else:
             st.warning("Não há jogadores suficientes no grupo para calcular similaridade.")
