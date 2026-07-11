@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import os
 import base64
 import numpy as np
+from datetime import datetime
 
 # --- MAPEAMENTO DE NOMES DE COLUNAS (PT-BR) ---
 COLUMN_LABELS = {
@@ -145,15 +146,20 @@ def format_market_value(val):
     return f"€{val}"
 
 # --- LOAD DATA ---
-@st.cache_data(ttl=3600)
-def load_data():
-    path = "data/dataset_brasileirao_2026.parquet"
-    if os.path.exists(path):
-        df = pd.read_parquet(path)
+DATA_PATH = "data/dataset_brasileirao_2026.parquet"
+
+def get_data_version():
+    if os.path.exists(DATA_PATH):
+        return os.path.getmtime(DATA_PATH)
+    return None
+
+@st.cache_data
+def load_data(data_version):
+    if data_version is not None and os.path.exists(DATA_PATH):
+        df = pd.read_parquet(DATA_PATH)
         return df
-    else:
-        st.warning(f"Extrato local ({path}) não encontrado. Execute o web scraper primeiro!")
-        return pd.DataFrame()
+    st.warning(f"Extrato local ({DATA_PATH}) não encontrado. Execute o web scraper primeiro!")
+    return pd.DataFrame()
 
 # --- UI HEADER: IMAGES ---
 col_logo1, col_logo2, _ = st.columns([1, 1, 4])
@@ -165,10 +171,15 @@ with col_logo2:
         # Mesma largura para tentar manter altura proporcional (ajuste se necessário)
         st.image("farroupilha.jpeg", width=120)
 
-df = load_data()
+data_version = get_data_version()
+df = load_data(data_version)
 
 # --- SIDEBAR FILTROS ---
 st.sidebar.markdown("## Filtros")
+
+if data_version is not None:
+    updated_at = datetime.fromtimestamp(data_version).strftime("%d/%m/%Y %H:%M")
+    st.sidebar.caption(f"Base carregada: {updated_at}")
 
 teams = sorted(df['team_name'].dropna().unique())
 selected_teams = st.sidebar.multiselect("Time", teams, default=[])
@@ -376,7 +387,7 @@ else:  # Comparador
     st.markdown("Pesquise por **qualquer jogador** na liga. O algoritmo encontrará os **Gêmeos Estatísticos** desse atleta, usando Distância Euclidiana nos percentis de todas as métricas.")
 
     # Usamos df_full (sem filtros de sidebar) para o comparador
-    df_full = load_data()
+    df_full = load_data(data_version)
 
     # Criar lista formatada para busca: "Nome do Jogador (Time)"
     player_options = df_full.apply(lambda x: f"{x['player_name']} ({x['team_name']})", axis=1).tolist()
