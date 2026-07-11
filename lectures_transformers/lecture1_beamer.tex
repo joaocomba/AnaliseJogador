@@ -1,0 +1,227 @@
+\documentclass[aspectratio=169]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,calc}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+% Custom 3B1B-inspired color palette
+\definecolor{darkblue}{RGB}{10, 25, 47}
+\definecolor{midblue}{RGB}{28, 73, 110}
+\definecolor{lightcyan}{RGB}{116, 192, 227}
+\definecolor{brownweight}{RGB}{140, 98, 57}
+\definecolor{textgray}{RGB}{40, 40, 40}
+\definecolor{bglight}{RGB}{248, 249, 250}
+\definecolor{highlight}{RGB}{220, 53, 69}
+
+\setbeamercolor{palette primary}{bg=darkblue,fg=white}
+\setbeamercolor{palette secondary}{bg=midblue,fg=white}
+\setbeamercolor{palette tertiary}{bg=lightcyan,fg=darkblue}
+\setbeamercolor{structure}{fg=midblue}
+\setbeamercolor{background canvas}{bg=bglight}
+\setbeamercolor{normal text}{fg=textgray}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{
+  \hfill\usebeamercolor[fg]{page number in head/foot}\usebeamerfont{page number in head/foot}
+  \insertframenumber\,/\,\inserttotalframenumber\kern2em\vskip2pt
+}
+
+\title{Lecture 1: Large Language Models \& The Transformer Architecture}
+\subtitle{A Visual and High-Level Introduction}
+\author{Transformer Lectures Series}
+\date{Based on 3Blue1Brown Lessons}
+
+\begin{document}
+
+% Slide 1: Title Slide
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% Slide 2: What is a GPT Model?
+\begin{frame}{What is a GPT Model?}
+  \begin{block}{\textbf{G}enerative \textbf{P}re-trained \textbf{T}ransformer}
+    An advanced neural network architecture optimized for processing and generating sequence data.
+  \end{block}
+  
+  \begin{itemize}
+    \item \textbf{Generative}: Designed to produce new sequence data (e.g., text, code, images).
+    \item \textbf{Pre-trained}: Trained on astronomical quantities of text data before task-specific tuning.
+    \item \textbf{Transformer}: A specific type of deep learning network introduced in 2017.
+  \end{itemize}
+  
+  \vspace{0.2cm}
+  \centering
+  \textbf{Applications}: Translation, voice-to-text, text-to-image, chatbots, and more.
+\end{frame}
+
+% Slide 3: The Core Objective: Next-Token Prediction
+\begin{frame}{The Fundamental Task: Next-Token Prediction}
+  Under the hood, all text-generating LLMs solve a simple task repeatedly:
+  \begin{center}
+    \textit{"Given a prompt, predict the single most likely chunk of text that follows."}
+  \end{center}
+  
+  \begin{itemize}
+    \item \textbf{Autoregressive Generation}: 
+      \begin{enumerate}
+        \item Accept user input.
+        \item Predict the next token (as a probability distribution).
+        \item Sample a token from that distribution.
+        \item Append the token to the context and repeat.
+      \end{enumerate}
+    \item This word-by-word (or token-by-token) execution is what you see in real-time chat interfaces.
+  \end{itemize}
+\end{frame}
+
+% Slide 4: Tokenization
+\begin{frame}{Tokenization: Translating Text to Data}
+  Computers do not read words; they read numbers. Input text is first sliced into \textbf{tokens}.
+  
+  \begin{exampleblock}{Example Sentence}
+    "To date, the cleverest thinker of all time was..."
+  \end{exampleblock}
+  
+  \begin{itemize}
+    \item \textbf{Sub-word splitting}: Large or rare words are broken into common roots and suffixes:
+      \begin{center}
+        \texttt{[To] [ date] [,] [ the] [ cle] [ve] [rest] [ thinker] [ of] [ all] [ time] [ was]}
+      \end{center}
+    \item \textbf{Vocabulary Map}: Every token corresponds to a specific integer ID in a fixed vocabulary (typically 50,000 to 100,000+ words/fragments).
+  \end{itemize}
+\end{frame}
+
+% Slide 5: High-Level Overview of the Transformer
+\begin{frame}{High-Level Architecture Block Diagram}
+  \centering
+  \begin{tikzpicture}[node distance=1.2cm, auto]
+    \tikzstyle{block} = [rectangle, draw, fill=midblue, text=white, text width=6cm, text centered, rounded corners, minimum height=0.6cm]
+    \tikzstyle{line} = [draw, -latex', thick]
+    
+    \node [block, fill=darkblue] (input) {Input Tokens (Word Indices)};
+    \node [block, below of=input] (embed) {Embedding Block (Token to Vector)};
+    \node [block, below of=embed] (attn) {Attention Block (Contextual Communication)};
+    \node [block, below of=attn] (mlp) {MLP / Feed-Forward Block (Parallel Processing)};
+    \node [block, below of=mlp, fill=brownweight] (softmax) {Softmax Projection (Probability Distribution)};
+    \node [block, below of=softmax, fill=darkblue] (output) {Next Token Prediction};
+    
+    \path [line] (input) -- (embed);
+    \path [line] (embed) -- (attn);
+    \path [line] (attn) -- (mlp);
+    \path [line] (mlp) -- (softmax);
+    \path [line] (softmax) -- (output);
+    
+    % Loop indicator
+    \draw [line, dashed, darkblue] (output.east) -- ++(1.5,0) |- (input.east) node [near start, right] {Append & Repeat};
+  \end{tikzpicture}
+\end{frame}
+
+% Slide 6: Layer 1: Input Embeddings
+\begin{frame}{Input Embeddings: Representing Meaning Geometrically}
+  \begin{itemize}
+    \item Once tokenized, each token is mapped to a vector in a high-dimensional space.
+    \item \textbf{Vector Coordinates}: These represent abstract semantic features.
+    \item \textbf{Geometric Semantics}:
+      \begin{itemize}
+        \item Words with similar meanings land near each other.
+        \item Directions in this space encode relationships (e.g., gender, tense, country-capital).
+      \end{itemize}
+    \item This vector space provides the raw material that the model will process.
+  \end{itemize}
+\end{frame}
+
+% Slide 7: Layer 2: The Attention Block (Communication)
+\begin{frame}{The Attention Block: Contextual Communication}
+  Static embeddings do not capture context. Attention is where words "talk" to each other.
+  
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \begin{exampleblock}{Context matters}
+        Compare:
+        \begin{itemize}
+          \item "A machine learning \textbf{model}"
+          \item "A famous fashion \textbf{model}"
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item Attention enables the vector for \textbf{model} to communicate with \textbf{machine} or \textbf{fashion}.
+        \item This updates its coordinates to represent its precise contextual meaning.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% Slide 8: Layer 3: The Multilayer Perceptron (MLP)
+\begin{frame}{The Multilayer Perceptron (MLP): Parallel Processing}
+  After communicating via attention, the updated vectors enter an MLP (Feed-Forward) layer.
+  
+  \begin{itemize}
+    \item \textbf{No Communication}: In this block, vectors do not talk to each other. They undergo the exact same mathematical operations in parallel.
+    \item \textbf{Key Intuition}: 
+      \begin{itemize}
+        \item The network asks a sequence of "questions" about each token's attributes (e.g., "Is this word a verb?", "Is this noun singular?").
+        \item Based on the answers, the token's vector is shifted.
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+% Slide 9: Stacking Blocks
+\begin{frame}{Deep Learning: Stacking Layers}
+  A single attention + MLP block is not enough. Transformers stack these blocks deeply.
+  
+  \begin{itemize}
+    \item \textbf{Depth}: 12 layers (GPT-2 Small) to 96 layers (GPT-3).
+    \item Each layer refines the vectors in the sequence, encoding increasingly abstract features:
+      \begin{itemize}
+        \item \textbf{Early layers}: Focus on syntax and basic grammar.
+        \item \textbf{Middle layers}: Focus on local semantic relationships and references.
+        \item \textbf{Late layers}: Synthesize global context to prepare the prediction.
+      \end{itemize}
+    \item Computation consists of matrix multiplications transforming the vector representations at each step.
+  \end{itemize}
+\end{frame}
+
+% Slide 10: Deep Learning Premise: Weights vs. Data
+\begin{frame}{Deep Learning Premise: Weights vs. Data}
+  To understand the math, we must separate the model's structure into two categories:
+  
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \begin{block}{\textbf{The Brains: Weights}}
+        \begin{itemize}
+          \item Tunable parameters (knobs/dials).
+          \item Organized in massive \textbf{matrices}.
+          \item Fixed after training.
+          \item E.g., GPT-3 has 175 billion weights.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{block}{\textbf{The Flow: Data / Tensors}}
+        \begin{itemize}
+          \item Arrays representing current inputs.
+          \item Pass through the network, constantly changing.
+          \item E.g., token vectors, intermediate activations.
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% Slide 11: Summary
+\begin{frame}{Summary: Lecture 1 Recap}
+  \begin{itemize}
+    \item GPTs generate text by repeatedly predicting the next token.
+    \item Text is tokenized, then represented as coordinate vectors in a high-dimensional space.
+    \item **Attention Blocks** allow tokens to share contextual information.
+    \item **MLP Blocks** process each token's vector independently in parallel.
+    \item Stacking these operations creates a deep network capable of capturing nuanced meaning.
+  \end{itemize}
+\end{frame}
+
+\end{document}

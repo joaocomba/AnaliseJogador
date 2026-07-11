@@ -102,15 +102,24 @@ async def main():
                 if pid:
                     all_players_meta[pid] = row.get('player', {}).get('name')
 
-        # Buscar detalhes (Posição e Valor de Mercado) de TODOS os jogadores
-        print(f"Fetching details (positions & market value) for {len(all_players_meta)} unique players...")
+        # Buscar detalhes (Posição e Valor de Mercado) apenas para jogadores NOVOS
         player_details = {}
+        if os.path.exists('data/player_details.json'):
+            try:
+                with open('data/player_details.json', 'r') as f:
+                    player_details = json.load(f)
+            except json.JSONDecodeError:
+                pass
+                
+        # Check for both int and str representations since JSON keys are always strings
+        new_pids = [pid for pid in all_players_meta.keys() if str(pid) not in player_details and pid not in player_details]
         
-        # Batching processing to show progress
-        pids = list(all_players_meta.keys())
-        for i, pid in enumerate(pids):
+        print(f"Found {len(all_players_meta)} unique players. {len(new_pids)} are new and need details fetching...")
+        
+        # Batching processing to show progress for NEW players
+        for i, pid in enumerate(new_pids):
             if i % 50 == 0:
-                print(f"Progress: {i}/{len(pids)} players fetched...")
+                print(f"Progress: {i}/{len(new_pids)} new players fetched...")
                 
             url = f"https://api.sofascore.com/api/v1/player/{pid}"
             try:
@@ -126,7 +135,8 @@ async def main():
                 data = await page.evaluate(js)
                 if data and 'player' in data:
                     p = data['player']
-                    player_details[pid] = {
+                    # Use string keys for JSON consistency
+                    player_details[str(pid)] = {
                         'position': p.get('position'),
                         'positionsDetailed': p.get('positionsDetailed', []),
                         'marketValue': p.get('proposedMarketValue')
@@ -138,7 +148,7 @@ async def main():
         with open('data/player_details.json', 'w') as f:
             json.dump(player_details, f)
             
-        print(f"Details fetched for {len(player_details)} players.")
+        print(f"Details saved for {len(player_details)} total players.")
         await browser.close()
         print("Data collection finished!")
 
