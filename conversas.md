@@ -29,8 +29,9 @@ Este arquivo registra o desenvolvimento do projeto através das solicitações d
 - [x] **Ordenação de Valores**: Corrigir a ordenação da coluna de mercado para ser numérica (removendo a formatação de string que quebrava o sort).
 - [x] **Identidade Visual**: Adicionar a imagem `farroupilha.jpeg` ao lado do logo do Brasileirão no topo.
 - [x] **Comparador**: Incluir a métrica de Valor de Mercado na tabela de comparação de métricas-chave e formatar com o padrão (€M/k).
-- [x] **Sidebar**: Remover logo redundante e definir todas as posições como selecionadas por default.
-- [x] **Registro**: Atualizar o arquivo `conversas.md` para documentar o progresso.
+## 🔄 Fase de Manutenção do Scraper (Sofascore API)
+- [x] **Correção do Scraper**: Atualizado o `scraper.py` para utilizar o novo endpoint `www.sofascore.com/api/v1/...` (em substituição ao endpoint legado `api.sofascore.com` bloqueado com HTTP 403) e ajustada a navegação do Playwright para evitar a checagem de robôs / captcha do Cloudflare.
+- [x] **Atualização de Dados (ETL)**: Reexecutado o scraper com sucesso (680+ jogadores em todas as categorias) e regerado o `data/dataset_brasileirao_2026.parquet` via `process_data.py`.
 
 ---
 *Este arquivo será atualizado automaticamente a cada nova solicitação.*
