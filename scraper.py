@@ -159,11 +159,48 @@ async def main():
                 data = await page.evaluate(js)
                 if data and 'player' in data:
                     p = data['player']
+                    pos_gen = p.get('position')
+                    pos_det = p.get('positionsDetailed', [])
+                    
+                    gk_stats = {}
+                    if pos_gen == 'G' or 'GK' in pos_det:
+                        try:
+                            gk_url = f"https://www.sofascore.com/api/v1/player/{pid}/unique-tournament/325/season/87678/statistics/overall"
+                            js_gk = f"""
+                            async () => {{
+                                try {{
+                                    const r = await fetch('{gk_url}');
+                                    if (r.status !== 200) return null;
+                                    return await r.json();
+                                }} catch(e) {{ return null; }}
+                            }}
+                            """
+                            gk_data = await page.evaluate(js_gk)
+                            if gk_data and 'statistics' in gk_data:
+                                st = gk_data['statistics']
+                                gk_stats = {
+                                    'saves': st.get('saves', 0),
+                                    'cleanSheet': st.get('cleanSheet', 0),
+                                    'goalsConceded': st.get('goalsConceded', 0),
+                                    'goalsPrevented': round(st.get('goalsPrevented', 0.0), 2),
+                                    'penaltySave': st.get('penaltySave', 0),
+                                    'penaltyFaced': st.get('penaltyFaced', 0),
+                                    'highClaims': st.get('highClaims', 0),
+                                    'punches': st.get('punches', 0),
+                                    'savedShotsFromInsideTheBox': st.get('savedShotsFromInsideTheBox', 0)
+                                }
+                        except Exception:
+                            pass
+
                     # Use string keys for JSON consistency
                     player_details[str(pid)] = {
-                        'position': p.get('position'),
-                        'positionsDetailed': p.get('positionsDetailed', []),
-                        'marketValue': p.get('proposedMarketValue')
+                        'position': pos_gen,
+                        'positionsDetailed': pos_det,
+                        'marketValue': p.get('proposedMarketValue'),
+                        'dateOfBirthTimestamp': p.get('dateOfBirthTimestamp'),
+                        'dateOfBirth': p.get('dateOfBirth'),
+                        'gk_stats': gk_stats,
+                        'xGOT': data.get('statistics', {}).get('shotsOnTarget', 0) if isinstance(data, dict) else 0
                     }
                 await asyncio.sleep(0.12) # Gentle rate limit
             except Exception:

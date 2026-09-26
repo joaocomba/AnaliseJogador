@@ -29,9 +29,15 @@ Este arquivo registra o desenvolvimento do projeto através das solicitações d
 - [x] **Ordenação de Valores**: Corrigir a ordenação da coluna de mercado para ser numérica (removendo a formatação de string que quebrava o sort).
 - [x] **Identidade Visual**: Adicionar a imagem `farroupilha.jpeg` ao lado do logo do Brasileirão no topo.
 - [x] **Comparador**: Incluir a métrica de Valor de Mercado na tabela de comparação de métricas-chave e formatar com o padrão (€M/k).
-## 🔄 Fase de Manutenção do Scraper (Sofascore API)
+## 🔄 Fase de Manutenção & Recursos Avançados
 - [x] **Correção do Scraper**: Atualizado o `scraper.py` para utilizar o novo endpoint `www.sofascore.com/api/v1/...` (em substituição ao endpoint legado `api.sofascore.com` bloqueado com HTTP 403) e ajustada a navegação do Playwright para evitar a checagem de robôs / captcha do Cloudflare.
 - [x] **Atualização de Dados (ETL)**: Reexecutado o scraper com sucesso (680+ jogadores em todas as categorias) e regerado o `data/dataset_brasileirao_2026.parquet` via `process_data.py`.
+- [x] **Comparador Personalizável & Pesos**: Adicionada a seleção de predefinições de métricas por posição (Ataque, Meio, Defesa, Goleiro), seleção dinâmica de estatísticas no multiselect e controle de pesos individuais (0.1x a 3.0x) para o cálculo da distância de similaridade e geração do gráfico de radar.
+- [x] **Valor de Desempenho (€) & Diferenças**: Criado modelo de precificação ajustado por desempenho (`Valor de Desempenho (€)`) que cruza o valor de mercado real com o percentil de rendimento estatístico na posição, ponderado pelo número de partidas jogadas (fator de amostragem/consistência), adicionando as colunas `Diferença de Valor (€)` e `Diferença (%)` na tabela do Detalhamento Interativo.
+- [x] **Estatísticas Específicas de Goleiro**: Coletadas e integradas 7 métricas exclusivas da meta (`Defesas`, `Jogos sem Sofrer Gol`, `Gols Evitados (xG)`, `Gols Sofridos`, `Pênaltis Defendidos`, `Bolas Altas Agarradas` e `Socos na Bola`), atualizando o perfil de predefinição do comparador e a valoração por posição.
+- [x] **Apresentação Beamer (LaTeX)**: Gerada e compilada a apresentação em PDF (`apresentacao_metricas.pdf`) de 11 slides com a documentação completa de todas as métricas, modelo de valoração e algoritmos.
+- [x] **Separacão de Laterais e Zagueiros**: Criado um perfil estatístico e predefinição dedicados para Laterais (`LD` e `LE`: `Desarmes`, `Interceptações`, `Passes Chave`, `Conversão de Passe (%)`, `Dribles` e `Nota Média`), desvinculando-os do perfil estritamente defensivo dos Zagueiros (`ZAG`) no modelo de valoração de mercado e nas predefinições do comparador.
+- [x] **Filtros de Idade e Valor de Mercado**: Adicionado o controle de faixa de idade e campos numéricos digitáveis (`Mín (€M)` e `Máx (€M)`) na barra lateral para filtragem direta de valores de mercado em milhões de euros.
 
 ---
 *Este arquivo será atualizado automaticamente a cada nova solicitação.*

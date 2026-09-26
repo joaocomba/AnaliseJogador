@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import json
 import os
 
@@ -107,18 +108,42 @@ else:
         base_df['market_value'] = base_df['player_id'].map(
             lambda pid: (details_map.get(str(pid)) or details_map.get(pid, {})).get('marketValue')
         )
+
+        # Inserir Idade
+        import time
+        now_ts = time.time()
+        def get_age(pid):
+            info = details_map.get(str(pid)) or details_map.get(pid, {})
+            dob_ts = info.get('dateOfBirthTimestamp')
+            if dob_ts:
+                try:
+                    return round((now_ts - float(dob_ts)) / (365.25 * 86400), 1)
+                except (ValueError, TypeError):
+                    return None
+            return None
+
+        base_df['age'] = base_df['player_id'].map(get_age)
         
-        print(f"Detalhes de posição e valor integrados para {len(base_df)} jogadores.")
+        # Inserir Estatísticas Específicas de Goleiro
+        gk_fields = ['saves', 'cleanSheet', 'goalsConceded', 'goalsPrevented', 'penaltySave', 'highClaims', 'punches']
+        for gk_f in gk_fields:
+            col_name = f"{gk_f}_goalkeeping"
+            base_df[col_name] = base_df['player_id'].map(
+                lambda pid: (details_map.get(str(pid)) or details_map.get(pid, {})).get('gk_stats', {}).get(gk_f, 0)
+            )
+
+        print(f"Detalhes de posição, valor, idade e estatísticas de goleiro integrados para {len(base_df)} jogadores.")
     else:
         base_df['position'] = "N/D"
         base_df['market_value'] = 0
+        base_df['age'] = None
         print("Aviso: player_details.json não encontrado.")
 
-    # Cálculo do GxG
-    if 'goals' in base_df.columns and 'expectedGoals' in base_df.columns:
-        base_df['goals'] = base_df['goals'].fillna(0)
+    # Cálculo do GxG (Eficiência Real: Gols - expectedGoals)
+    if 'expectedGoals' in base_df.columns:
         base_df['expectedGoals'] = base_df['expectedGoals'].fillna(0)
-        base_df['GxG'] = base_df['goals'] - base_df['expectedGoals']
+        base_df['goals'] = base_df.get('goals', pd.Series(0, index=base_df.index)).fillna(0)
+        base_df['GxG'] = (base_df['goals'] - base_df['expectedGoals']).round(2)
     
     # Renomear algumas colunas de 'detailed' para nomes mais amigáveis antes do processamento final se necessário
     # mas o app.py cuida disso via COLUMN_LABELS.

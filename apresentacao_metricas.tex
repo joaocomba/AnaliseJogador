@@ -1,0 +1,275 @@
+\documentclass[aspectratio=169, 10pt]{beamer}
+\usetheme{Madrid}
+\usecolortheme{whale}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[portuguese]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{colortbl}
+
+% Personalização de Cores
+\definecolor{mainblue}{RGB}{30, 58, 138}
+\definecolor{accentblue}{RGB}{59, 130, 246}
+\definecolor{darkgray}{RGB}{31, 41, 55}
+\definecolor{lightgray}{RGB}{243, 244, 246}
+
+\setbeamercolor{palette primary}{bg=mainblue, fg=white}
+\setbeamercolor{palette secondary}{bg=accentblue, fg=white}
+\setbeamercolor{palette tertiary}{bg=darkgray, fg=white}
+\setbeamercolor{titlelike}{parent=palette primary}
+\setbeamercolor{structure}{fg=mainblue}
+
+\title[Dashboard Brasileirão 2026]{Dashboard de Performance de Jogadores -- Brasileirão 2026}
+\subtitle{Documentação Completa de Métricas, Valoração de Mercado e Algoritmo de Similaridade}
+\author[AnaliseJogador]{Sistema Integrado de Análise Estatística}
+\institute[Brasileirão Analytics]{Brasileirão Analytics Betano 2026}
+\date{\today}
+
+\begin{document}
+
+% --- SLIDE DE TÍTULO ---
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% --- SLIDE 1: INTRODUÇÃO E ARQUITETURA ---
+\begin{frame}{1. Arquitetura do Sistema e Coleta de Dados}
+  \begin{columns}
+    \begin{column}{0.55\textwidth}
+      \begin{block}{Pipeline de Dados (ETL)}
+        \begin{itemize}
+          \item \textbf{Scraping Automático (Playwright)}: Coleta direta das APIs públicas do Sofascore para 640+ jogadores da Série A.
+          \item \textbf{Processamento (ETL em Pandas)}: Consolidação das 5 categorias em dataset unificado Parquet (\texttt{dataset\_brasileirao\_2026.parquet}).
+          \item \textbf{Resolução de Atributos}: Mapeamento de posições brasileiras (\texttt{ATA, MEI, ZAG, GL, etc.}), idades, estatísticas de goleiro e valores de mercado em euros (€).
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.40\textwidth}
+      \begin{alertblock}{Base Consolidada}
+        \centering
+        \textbf{5 Categorias Coletadas:}
+        \begin{enumerate}
+          \item Attack (Ataque)
+          \item Defence (Defesa)
+          \item Passing (Passe)
+          \item Goalkeeping (Goleiro)
+          \item Detailed (Detalhes)
+        \end{enumerate}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --- SLIDE 2: MÉTRICAS OFENSIVAS ---
+\begin{frame}{2. Métricas Ofensivas (Ataque)}
+  \begin{table}
+    \centering
+    \small
+    \begin{tabular}{lll}
+      \toprule
+      \textbf{Métrica} & \textbf{Código Interno} & \textbf{Descrição / Significado Técnico} \\
+      \midrule
+      \textbf{Gols} & \texttt{goals} & Total de gols marcados pelo jogador na competição. \\
+      \textbf{xG} & \texttt{expectedGoals} & Gols Esperados com base na qualidade das finalizações. \\
+      \rowcolor{lightgray}
+      \textbf{GxG} & \texttt{GxG} & \textbf{Diferencial de Eficiência}: $\text{Gols} - \text{xG}$ (Over/Underperformance). \\
+      \textbf{Finalizações} & \texttt{totalShots} & Volume total de chutes tentados (no gol ou para fora). \\
+      \textbf{Dribles} & \texttt{successfulDribbles} & Dribles e conduções individuais completadas com sucesso. \\
+      \rowcolor{lightgray}
+      \textbf{Chances Perdidas} & \texttt{bigChancesMissed} & \textbf{Métrica Negativa}: Grandes chances claras não convertidas. \\
+      \textbf{Conversão (\%)} & \texttt{goalConversionPct} & Eficiência de finalização: $(\text{Gols} / \text{Finalizações}) \times 100$. \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% --- SLIDE 3: MÉTRICAS DE PASSE E CRIAÇÃO ---
+\begin{frame}{3. Métricas de Passe e Criação de Jogadas}
+  \begin{columns}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Armação e Visão de Jogo}
+        \begin{itemize}
+          \item \textbf{Assistências (\texttt{assists\_passing})}: Passes diretos que resultaram em gol de um companheiro.
+          \item \textbf{Passes Chave (\texttt{keyPasses\_passing})}: Passes que resultaram em finalização sem gol.
+          \item \textbf{Chances Criadas (\texttt{bigChancesCreated})}: Oportunidades claras de gol geradas para a equipe.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Retenção e Precisão de Passe}
+        \begin{itemize}
+          \item \textbf{Passes Certos (\texttt{accuratePasses\_passing})}: Volume absoluto de passes corretos distribuídos.
+          \item \textbf{Conversão de Passe (\%) (\texttt{accuratePassesPct})}: Taxa de precisão nos passes tentados.
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --- SLIDE 4: MÉTRICAS DEFENSIVAS ---
+\begin{frame}{4. Métricas Defensivas e Disciplinares}
+  \begin{columns}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Ações Defensivas de Linha}
+        \begin{itemize}
+          \item \textbf{Desarmes (\texttt{tackles\_defence})}: Desarmes efetuados no adversário.
+          \item \textbf{Interceptações (\texttt{interceptions})}: Interrupções de passes rivais.
+          \item \textbf{Cortes (\texttt{clearances\_defence})}: Afastamentos de bola da área de perigo.
+          \item \textbf{Chutes Bloqueados (\texttt{outfielderBlocks})}: Bloqueios de arremates adversários.
+          \item \textbf{Duelos Ganhos (\texttt{totalDuelsWon})}: Disputas físicas e aéreas vencidas.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Consistência e Disciplina}
+        \begin{itemize}
+          \item \textbf{Nota Média (\texttt{rating})}: Avaliação estatística ponderada por partida.
+          \item \textbf{Partidas (\texttt{appearances})}: Total de jogos disputados no torneio.
+          \item \textbf{Erros p/ Gol (\texttt{errorLeadToGoal})}: Falhas graves que originaram gol rival.
+          \item \textbf{Cartões (\texttt{yellow/redCards})}: Registro de punições disciplinares.
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --- SLIDE 5: ESTATÍSTICAS DE GOLEIRO ---
+\begin{frame}{5. Estatísticas Específicas de Goleiro}
+  \begin{table}
+    \centering
+    \small
+    \begin{tabular}{lll}
+      \toprule
+      \textbf{Métrica} & \textbf{Código Interno} & \textbf{Descrição / Significado Técnico} \\
+      \midrule
+      \textbf{Defesas} & \texttt{saves\_goalkeeping} & Total de defesas efetuadas no campeonato. \\
+      \textbf{Jogos sem Gol} & \texttt{cleanSheet\_goalkeeping} & Partidas completas sem sofrer gols (Clean Sheets). \\
+      \rowcolor{lightgray}
+      \textbf{Gols Evitados (xG)} & \texttt{goalsPrevented} & \textbf{Performance Relativa}: xG Sofrido vs Gols Reais. \\
+      \textbf{Gols Sofridos} & \texttt{goalsConceded} & Total de tentos sofridos pela meta. \\
+      \textbf{Pênaltis Defendidos} & \texttt{penaltySave} & Penalidades máximas defendidas com sucesso. \\
+      \rowcolor{lightgray}
+      \textbf{Bolas Altas / Socos} & \texttt{highClaims / punches} & Intervenções em cruzamentos e bolas aéreas. \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% --- SLIDE 6: MODELO DE VALORAÇÃO DE MERCADO ---
+\begin{frame}{6. Modelo de Precificação: Valor de Desempenho (€)}
+  \begin{block}{Conceito do Modelo}
+    O \textbf{Valor de Desempenho (€)} ajusta o valor de mercado real do Sofascore cruzando a qualidade estatística na posição, a amostragem de jogos e a idade do atleta.
+  \end{block}
+
+  \begin{equation*}
+    \text{Valor de Desempenho (€)} = \text{Valor Base (€)} \times \mathbf{M_{\text{desempenho}}} \times \mathbf{W_{\text{amostra}}} \times \mathbf{M_{\text{idade}}}
+  \end{equation*}
+
+  \begin{itemize}
+    \item \textbf{Multiplicador de Desempenho ($M_{\text{desempenho}}$)}: Calculado pelo percentil médio do jogador ($0.60\times$ a $1.40\times$) nas estatísticas específicas da sua posição.
+    \item \textbf{Novas Colunas Geradas}:
+      \begin{enumerate}
+        \item \textbf{Diferença de Valor (€)}: $\text{Valor de Desempenho} - \text{Valor Real}$
+        \item \textbf{Diferença (\%)}: $\frac{\text{Valor de Desempenho} - \text{Valor Real}}{\text{Valor Real}} \times 100$
+      \end{enumerate}
+  \end{itemize}
+\end{frame}
+
+% --- SLIDE 7: FATORES DE AMOSTRAGEM E IDADE ---
+\begin{frame}{7. Fatores de Ajuste: Amostragem e Idade}
+  \begin{columns}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{1. Fator de Amostragem ($W_{\text{amostra}}$)}
+        Evita distorções por amostra pequena (poucos jogos):
+        \begin{equation*}
+          W_{\text{amostra}} = \text{clip}\left(\frac{\text{Partidas}}{15}, \, 0.20, \, 1.00\right)
+        \end{equation*}
+        \begin{itemize}
+          \item $1 - 3$ jogos: Peso $\sim 20\% - 30\%$ (ancorado no valor base).
+          \item $15+$ jogos: Peso de $100\%$ (confiança estatística total).
+        \end{itemize}
+      \end{block}
+    \end{column}
+    
+    \begin{column}{0.48\textwidth}
+      \begin{block}{2. Fator de Idade e Potencial ($M_{\text{idade}}$)}
+        Reflete o potencial futuro de revenda:
+        \begin{itemize}
+          \item \textbf{$\le 23$ anos}: $+5\%$ ao ano de juventude.
+            \begin{equation*}
+              M_{\text{idade}} = 1.0 + 0.05 \times (23 - \text{Idade})
+            \end{equation*}
+          \item \textbf{$24 - 28$ anos}: Ápice físico/tático ($1.00\times$).
+          \item \textbf{$> 28$ anos}: Depreciação de $-3.5\%$ ao ano.
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --- SLIDE 8: MOTOR DE SIMILARIDADE E PESOS ---
+\begin{frame}{8. Motor de Similaridade \& Pesos Personalizados}
+  \begin{block}{Distância Euclidiana Ponderada nos Percentis}
+    Permite encontrar os \textbf{Gêmeos Estatísticos} do jogador alvo usando métricas e pesos selecionados pelo usuário ($w_i \in [0.1\times, 3.0\times]$):
+  \end{block}
+
+  \begin{equation*}
+    d(j, \text{alvo}) = \sqrt{\sum_{i=1}^{k} w_i \cdot \left( P_{j, i} - P_{\text{alvo}, i} \right)^2}
+  \end{equation*}
+
+  \begin{itemize}
+    \item \textbf{Predefinições de Perfil}: Seleção automática de métricas relevantes para \textit{Ataque}, \textit{Meio-Campo}, \textit{Laterais}, \textit{Zaga/Volante}, \textit{Goleiro} ou \textit{Customizado}.
+    \item \textbf{Percentual de Similaridade (\%)}:
+      \begin{equation*}
+        \text{Similaridade (\%)} = \max\left(0, \, \left(1 - \frac{d}{\sqrt{\sum w_i}}\right) \times 100\right)
+      \end{equation*}
+  \end{itemize}
+\end{frame}
+
+% --- SLIDE 9: VISUALIZAÇÃO EM RADAR E TOP 3 ---
+\begin{frame}{9. Visualização Gráfica e Tabela Comparativa}
+  \begin{columns}
+    \begin{column}{0.50\textwidth}
+      \begin{block}{Gráfico de Radar Quadri-Traçado}
+        Plota simultaneamente os percentis de 4 atletas:
+        \begin{itemize}
+          \item \textbf{Jogador Alvo} (Cinza Escuro)
+          \item \textbf{1º Mais Similar} (Azul)
+          \item \textbf{2º Mais Similar} (Verde)
+          \item \textbf{3º Mais Similar} (Laranja)
+        \end{itemize}
+      \end{block}
+    \end{column}
+    
+    \begin{column}{0.46\textwidth}
+      \begin{block}{Cards do Top 3}
+        Exibe em cada card:
+        \begin{itemize}
+          \item Nome e Posição do Atleta
+          \item Clube e Similaridade (\%)
+          \item Valor de Mercado Real (€)
+          \item Valor de Desempenho (€)
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% --- SLIDE 10: CONCLUSÃO ---
+\begin{frame}{10. Conclusão e Aplicações Práticas}
+  \begin{alertblock}{Aplicações para Scouting e Análise de Mercado}
+    \begin{itemize}
+      \item \textbf{Identificação de Pechinchas (Under-valued)}: Filtragem de jogadores onde o $\text{Valor de Desempenho} \gg \text{Valor Real}$.
+      \item \textbf{Busca por Substitutos}: Encontrar substitutos estatísticos diretos para atletas negociados.
+      \item \textbf{Ponderação por Posição}: Comparação justa ajustada ao papel tático de cada jogador.
+    \end{itemize}
+  \end{alertblock}
+  \centering
+  \vspace{0.5cm}
+  \textbf{Obrigado!} \\
+  \small\textit{Dashboard de Performance de Jogadores -- Brasileirão Série A 2026}
+\end{frame}
+
+\end{document}
