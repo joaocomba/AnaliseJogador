@@ -40,9 +40,9 @@
     \begin{column}{0.55\textwidth}
       \begin{block}{Pipeline de Dados (ETL)}
         \begin{itemize}
-          \item \textbf{Scraping Automático (Playwright)}: Coleta direta das APIs públicas do Sofascore para 640+ jogadores da Série A.
+          \item \textbf{Scraping Automático (Playwright)}: Coleta direta das APIs públicas do Sofascore para 680+ jogadores da Série A.
           \item \textbf{Processamento (ETL em Pandas)}: Consolidação das 5 categorias em dataset unificado Parquet (\texttt{dataset\_brasileirao\_2026.parquet}).
-          \item \textbf{Resolução de Atributos}: Mapeamento de posições brasileiras (\texttt{ATA, MEI, ZAG, GL, etc.}), idades, estatísticas de goleiro e valores de mercado em euros (€).
+          \item \textbf{Resolução de Atributos}: Mapeamento de posições brasileiras (\texttt{ATA, PE, PD, MEI, MC, VOL, ZAG, LD, LE, GL}), idades e valores de mercado (€).
         \end{itemize}
       \end{block}
     \end{column}
@@ -108,27 +108,24 @@
   \end{columns}
 \end{frame}
 
-% --- SLIDE 4: MÉTRICAS DEFENSIVAS ---
-\begin{frame}{4. Métricas Defensivas e Disciplinares}
+% --- SLIDE 4: MÉTRICAS DEFENSIVAS E ESPECIALIZAÇÃO DE POSIÇÃO ---
+\begin{frame}{4. Métricas Defensivas e Especialização por Posição}
   \begin{columns}
     \begin{column}{0.48\textwidth}
-      \begin{block}{Ações Defensivas de Linha}
+      \begin{block}{Zagueiros vs Laterais}
         \begin{itemize}
-          \item \textbf{Desarmes (\texttt{tackles\_defence})}: Desarmes efetuados no adversário.
-          \item \textbf{Interceptações (\texttt{interceptions})}: Interrupções de passes rivais.
-          \item \textbf{Cortes (\texttt{clearances\_defence})}: Afastamentos de bola da área de perigo.
-          \item \textbf{Chutes Bloqueados (\texttt{outfielderBlocks})}: Bloqueios de arremates adversários.
-          \item \textbf{Duelos Ganhos (\texttt{totalDuelsWon})}: Disputas físicas e aéreas vencidas.
+          \item \textbf{Zagueiros (\texttt{ZAG})}: Foco em sustentação física ($\text{cortes}$, $\text{bloqueios}$, $\text{desarmes}$, $\text{duelos}$).
+          \item \textbf{Laterais (\texttt{LD / LE})}: Perfil misto de apoio e defesa ($\text{desarmes}$, $\text{interceptações}$, $\text{passes chave}$, $\text{dribles}$, $\text{acerto de passe}$).
         \end{itemize}
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
-      \begin{block}{Consistência e Disciplina}
+      \begin{block}{Ações Defensivas Gerais}
         \begin{itemize}
-          \item \textbf{Nota Média (\texttt{rating})}: Avaliação estatística ponderada por partida.
-          \item \textbf{Partidas (\texttt{appearances})}: Total de jogos disputados no torneio.
-          \item \textbf{Erros p/ Gol (\texttt{errorLeadToGoal})}: Falhas graves que originaram gol rival.
-          \item \textbf{Cartões (\texttt{yellow/redCards})}: Registro de punições disciplinares.
+          \item \textbf{Desarmes (\texttt{tackles\_defence})}: Desarmes efetuados no adversário.
+          \item \textbf{Interceptações (\texttt{interceptions})}: Interrupções de passes rivais.
+          \item \textbf{Cortes (\texttt{clearances\_defence})}: Afastamentos de bola da área.
+          \item \textbf{Chutes Bloqueados (\texttt{outfielderBlocks})}: Bloqueios de arremates.
         \end{itemize}
       \end{block}
     \end{column}
@@ -168,7 +165,7 @@
   \end{equation*}
 
   \begin{itemize}
-    \item \textbf{Multiplicador de Desempenho ($M_{\text{desempenho}}$)}: Calculado pelo percentil médio do jogador ($0.60\times$ a $1.40\times$) nas estatísticas específicas da sua posição.
+    \item \textbf{Multiplicador de Desempenho ($M_{\text{desempenho}}$)}: Calculado pelo percentil médio do jogador ($0.60\times$ a $1.40\times$) nas estatísticas específicas da sua posição (incluindo perfil próprio para \texttt{LD/LE}).
     \item \textbf{Novas Colunas Geradas}:
       \begin{enumerate}
         \item \textbf{Diferença de Valor (€)}: $\text{Valor de Desempenho} - \text{Valor Real}$
@@ -209,10 +206,10 @@
   \end{columns}
 \end{frame}
 
-% --- SLIDE 8: MOTOR DE SIMILARIDADE E PESOS ---
-\begin{frame}{8. Motor de Similaridade \& Pesos Personalizados}
+% --- SLIDE 8: MOTOR DE SIMILARIDADE E FILTROS LATERAIS ---
+\begin{frame}{8. Motor de Similaridade, Pesos \& Filtros}
   \begin{block}{Distância Euclidiana Ponderada nos Percentis}
-    Permite encontrar os \textbf{Gêmeos Estatísticos} do jogador alvo usando métricas e pesos selecionados pelo usuário ($w_i \in [0.1\times, 3.0\times]$):
+    Permite encontrar os \textbf{Gêmeos Estatísticos} do jogador alvo usando métricas e pesos selecionados ($w_i \in [0.1\times, 3.0\times]$):
   \end{block}
 
   \begin{equation*}
@@ -220,11 +217,12 @@
   \end{equation*}
 
   \begin{itemize}
-    \item \textbf{Predefinições de Perfil}: Seleção automática de métricas relevantes para \textit{Ataque}, \textit{Meio-Campo}, \textit{Laterais}, \textit{Zaga/Volante}, \textit{Goleiro} ou \textit{Customizado}.
-    \item \textbf{Percentual de Similaridade (\%)}:
-      \begin{equation*}
-        \text{Similaridade (\%)} = \max\left(0, \, \left(1 - \frac{d}{\sqrt{\sum w_i}}\right) \times 100\right)
-      \end{equation*}
+    \item \textbf{Predefinições de Perfil}: Seleção automática para \textit{Ataque}, \textit{Meio-Campo}, \textit{Laterais}, \textit{Zaga/Volante}, \textit{Goleiro} ou \textit{Customizado}.
+    \item \textbf{Filtros Interativos na Sidebar}:
+      \begin{itemize}
+        \item \textbf{Faixa de Idade}: Slider duplo para limitar anos de nascimento.
+        \item \textbf{Valor de Mercado (€M)}: Caixas de entrada numéricas digitáveis ($\text{Mín}$ e $\text{Máx}$).
+      \end{itemize}
   \end{itemize}
 \end{frame}
 
@@ -263,11 +261,12 @@
     \begin{itemize}
       \item \textbf{Identificação de Pechinchas (Under-valued)}: Filtragem de jogadores onde o $\text{Valor de Desempenho} \gg \text{Valor Real}$.
       \item \textbf{Busca por Substitutos}: Encontrar substitutos estatísticos diretos para atletas negociados.
-      \item \textbf{Ponderação por Posição}: Comparação justa ajustada ao papel tático de cada jogador.
+      \item \textbf{Ponderação Especializada por Posição}: Separação entre laterais e zagueiros para análises táticas fiéis.
+      \item \textbf{Filtros de Entrada Numérica}: Pesquisas direcionadas por teto orçamentário digitável em milhões de euros.
     \end{itemize}
   \end{alertblock}
   \centering
-  \vspace{0.5cm}
+  \vspace{0.3cm}
   \textbf{Obrigado!} \\
   \small\textit{Dashboard de Performance de Jogadores -- Brasileirão Série A 2026}
 \end{frame}
